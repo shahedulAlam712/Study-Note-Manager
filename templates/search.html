@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Search: {{ query }}{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Search Results</h1>
+
+<p style="color:var(--muted); margin-bottom:1.5rem;">
+  {% if results %}
+    {{ results|length }} result{{ 's' if results|length != 1 }} for <strong style="color:var(--accent);">"{{ query }}"</strong>
+  {% else %}
+    No results for <strong style="color:var(--accent);">"{{ query }}"</strong>
+  {% endif %}
+</p>
+
+{% if results %}
+<div style="display:grid; gap:1rem;">
+  {% for note in results %}
+  <a href="/note/{{ note.id }}" style="text-decoration:none;">
+    <div style="
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      transition: border-color .2s;
+    " onmouseover="this.style.borderColor='var(--accent)'"
+       onmouseout="this.style.borderColor='var(--border)'">
+
+      <div style="display:flex; justify-content:space-between; align-items:start; gap:1rem; margin-bottom:.5rem;">
+        <h2 style="font-family:var(--font-serif); font-size:1.1rem; color:var(--text);">{{ note.title }}</h2>
+        <span style="font-size:.75rem; color:var(--muted); white-space:nowrap;">{{ note.updated_at[:10] }}</span>
+      </div>
+
+      {% if note.summary %}
+      <p style="color:var(--muted); font-size:.875rem; margin-bottom:.75rem;">{{ note.summary }}</p>
+      {% endif %}
+
+      <div style="display:flex; flex-wrap:wrap; gap:.4rem;">
+        {% for tag in note.tags.split(',') %}{% if tag.strip() %}<span class="tag">{{ tag.strip() }}</span>{% endif %}{% endfor %}
+        {% for kw in note.keywords[:5] %}<span class="kw-tag">{{ kw }}</span>{% endfor %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div style="text-align:center; padding:4rem 2rem; color:var(--muted);">
+  <div style="font-size:3rem; margin-bottom:1rem;">🔍</div>
+  <p>Try different keywords, or <a href="/new" style="color:var(--accent);">create a new note</a>.</p>
+</div>
+{% endif %}
+{% endblock %}

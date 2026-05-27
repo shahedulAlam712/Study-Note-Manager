@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}{{ note.title }}{% endblock %}
+
+{% block extra_head %}
+<!-- Markdown rendering -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<!-- Math rendering -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<style>
+  .md-content h1,h2,h3 { font-family: var(--font-serif); color: var(--text); margin: .75rem 0 .4rem; }
+  .md-content h1 { font-size: 1.4rem; }
+  .md-content h2 { font-size: 1.2rem; }
+  .md-content h3 { font-size: 1.05rem; }
+  .md-content p  { margin-bottom: .6rem; }
+  .md-content ul, .md-content ol { padding-left: 1.5rem; margin-bottom: .6rem; }
+  .md-content li { margin-bottom: .25rem; }
+  .md-content strong { color: var(--accent); }
+  .md-content code { background: rgba(200,169,110,.12); padding: .1rem .35rem; border-radius: 3px; font-family: var(--font-mono); font-size: .85em; }
+  .md-content pre  { background: rgba(0,0,0,.3); padding: .75rem 1rem; border-radius: 6px; overflow-x: auto; margin-bottom: .6rem; }
+  .md-content pre code { background: none; padding: 0; }
+  .md-content blockquote { border-left: 3px solid var(--accent); padding-left: .75rem; color: var(--muted); margin: .5rem 0; }
+  .katex-display { overflow-x: auto; margin: .5rem 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div style="display:flex; justify-content:space-between; align-items:start; gap:1rem; margin-bottom:2rem;">
+  <div>
+    <p style="color:var(--muted); font-size:.8rem; margin-bottom:.4rem;">
+      Created {{ note.created_at[:10] }} · Updated {{ note.updated_at[:10] }}
+    </p>
+    <h1 style="font-family:var(--font-serif); font-size:2rem; font-weight:700;">{{ note.title }}</h1>
+    {% if note.tags %}
+    <div style="margin-top:.75rem; display:flex; flex-wrap:wrap; gap:.4rem;">
+      {% for tag in note.tags.split(',') %}
+        {% if tag.strip() %}
+          <span class="tag">{{ tag.strip() }}</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <div style="display:flex; gap:.5rem; flex-shrink:0;">
+    <a href="/edit/{{ note.id }}" class="btn">✏️ Edit</a>
+    <form method="POST" action="/delete/{{ note.id }}" onsubmit="return confirm('Delete this note?')">
+      <button type="submit" class="btn btn-danger">🗑 Delete</button>
+    </form>
+  </div>
+</div>
+
+<!-- Grid: main content + AI panel -->
+<div style="display:grid; grid-template-columns:1fr 300px; gap:2rem; align-items:start;">
+
+  <!-- Left: Note content -->
+  <div>
+    <!-- AI Summary -->
+    {% if note.summary %}
+    <div style="background:rgba(200,169,110,.07); border-left:3px solid var(--accent); padding:1rem 1.25rem; border-radius:0 var(--radius) var(--radius) 0; margin-bottom:1.75rem;">
+      <p style="font-size:.7rem; font-family:var(--font-mono); color:var(--accent); margin-bottom:.6rem; text-transform:uppercase; letter-spacing:.1em;">✨ AI Summary</p>
+      <!-- id="summary-content" so JS can render markdown+math -->
+      <div id="summary-content" class="md-content" style="font-size:.9rem; color:var(--text);">{{ note.summary }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Raw note content -->
+    <div id="note-content" class="md-content" style="
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      line-height: 1.8;
+      font-size: .9375rem;
+    ">{{ note.content }}</div>
+  </div>
+
+  <!-- Right: AI Panel -->
+  <div style="display:flex; flex-direction:column; gap:1.5rem;">
+
+    <!-- Keywords -->
+    {% if note.keywords %}
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1.25rem;">
+      <p style="font-size:.7rem; font-family:var(--font-mono); color:var(--accent); margin-bottom:.75rem; text-transform:uppercase; letter-spacing:.1em;">🔑 Key Concepts</p>
+      <div style="display:flex; flex-wrap:wrap; gap:.4rem;">
+        {% for kw in note.keywords %}
+          <span class="kw-tag">{{ kw }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Quiz -->
+    {% if note.quiz %}
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1.25rem;">
+      <p style="font-size:.7rem; font-family:var(--font-mono); color:var(--accent2); margin-bottom:1rem; text-transform:uppercase; letter-spacing:.1em;">🧠 Practice Quiz</p>
+
+      {% for q in note.quiz %}
+      <div style="margin-bottom:1.25rem; padding-bottom:1.25rem; border-bottom:1px solid var(--border);" id="q{{ loop.index }}">
+        <p class="md-content" style="font-size:.85rem; font-weight:500; margin-bottom:.6rem;">
+          <span style="color:var(--muted); font-family:var(--font-mono);">Q{{ loop.index }}.</span>
+          {{ q.question }}
+        </p>
+
+        {% if q.type == 'mcq' %}
+          <div style="display:flex; flex-direction:column; gap:.35rem;">
+            {% for opt in q.options %}
+            <label style="
+              display:flex; align-items:center; gap:.5rem;
+              background:var(--bg); border:1px solid var(--border);
+              border-radius:var(--radius); padding:.4rem .65rem;
+              font-size:.8rem; cursor:pointer;
+              transition:border-color .15s;
+            " onmouseover="this.style.borderColor='var(--accent2)'"
+               onmouseout="this.style.borderColor='var(--border)'">
+              <input type="radio" name="q{{ loop.index }}_outer" value="{{ opt }}"
+                     onchange="checkAnswer(this, {{ q.answer | tojson }}, 'q{{ loop.index }}')"
+                     style="accent-color:var(--accent2);">
+              <span class="md-content">{{ opt }}</span>
+            </label>
+            {% endfor %}
+          </div>
+
+        {% else %}
+          <div style="display:flex; gap:.5rem;">
+            {% for opt in ['True', 'False'] %}
+            <label style="
+              flex:1; display:flex; align-items:center; justify-content:center; gap:.4rem;
+              background:var(--bg); border:1px solid var(--border);
+              border-radius:var(--radius); padding:.4rem;
+              font-size:.8rem; cursor:pointer;
+            " onmouseover="this.style.borderColor='var(--accent2)'"
+               onmouseout="this.style.borderColor='var(--border)'">
+              <input type="radio" name="q{{ loop.index }}_outer" value="{{ opt }}"
+                     onchange="checkAnswer(this, {{ q.answer | tojson }}, 'q{{ loop.index }}')"
+                     style="accent-color:var(--accent2);">
+              {{ opt }}
+            </label>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div id="q{{ loop.index }}-feedback" style="display:none; margin-top:.5rem; font-size:.78rem; padding:.35rem .6rem; border-radius:var(--radius);"></div>
+        <details style="margin-top:.4rem;">
+          <summary style="font-size:.72rem; color:var(--muted); cursor:pointer;">Show hint</summary>
+          <p class="md-content" style="font-size:.75rem; color:var(--muted); margin-top:.25rem; font-style:italic;">{{ q.hint }}</p>
+        </details>
+      </div>
+      {% endfor %}
+
+      <p id="quiz-score" style="font-size:.8rem; color:var(--muted); text-align:center;"></p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+  // ── Render Markdown for all .md-content elements ──────────────────
+  document.querySelectorAll('.md-content').forEach(el => {
+    el.innerHTML = marked.parse(el.textContent || el.innerText);
+  });
+
+  // ── Render LaTeX math (KaTeX auto-render) ─────────────────────────
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true  },
+      { left: '$',  right: '$',  display: false },
+      { left: '\\(', right: '\\)', display: false },
+      { left: '\\[', right: '\\]', display: true  },
+    ],
+    throwOnError: false,
+  });
+
+  // ── Quiz logic ────────────────────────────────────────────────────
+  let score = 0, answered = 0;
+  const total = {{ note.quiz | length }};
+
+  function checkAnswer(radio, correct, qId) {
+    const feedback = document.getElementById(qId + '-feedback');
+    const isCorrect = radio.value.trim().toLowerCase() === correct.trim().toLowerCase();
+    document.querySelectorAll(`input[name="${radio.name}"]`).forEach(r => r.disabled = true);
+    if (isCorrect) {
+      score++;
+      feedback.style.background = 'rgba(110,200,138,.12)';
+      feedback.style.color = 'var(--success)';
+      feedback.textContent = '✓ Correct!';
+    } else {
+      feedback.style.background = 'rgba(200,110,110,.12)';
+      feedback.style.color = 'var(--danger)';
+      feedback.textContent = `✗ Incorrect. Answer: ${correct}`;
+    }
+    feedback.style.display = 'block';
+    answered++;
+    if (answered === total) {
+      const pct = Math.round(score / total * 100);
+      const el = document.getElementById('quiz-score');
+      el.textContent = `Score: ${score}/${total} (${pct}%)`;
+      el.style.color = pct >= 70 ? 'var(--success)' : 'var(--danger)';
+    }
+  }
+</script>
+{% endblock %}

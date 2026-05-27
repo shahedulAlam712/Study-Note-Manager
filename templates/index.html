@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}All Notes{% endblock %}
+
+{% block content %}
+<h1 class="page-title">My Study Notes</h1>
+
+{% if notes %}
+<div style="display:grid; gap:1rem;">
+  {% for note in notes %}
+  <a href="/note/{{ note.id }}" style="text-decoration:none;">
+    <div style="
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      transition: border-color .2s, transform .15s;
+      cursor: pointer;
+    " onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-1px)'"
+       onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+
+      <div style="display:flex; justify-content:space-between; align-items:start; gap:1rem; margin-bottom:.6rem;">
+        <h2 style="font-family:var(--font-serif); font-size:1.15rem; color:var(--text);">{{ note.title }}</h2>
+        <span style="font-size:.75rem; color:var(--muted); white-space:nowrap;">{{ note.updated_at[:10] }}</span>
+      </div>
+
+      {% if note.summary %}
+        <p style="color:var(--muted); font-size:.875rem; margin-bottom:.75rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+          {{ note.summary }}
+        </p>
+      {% endif %}
+
+      <div style="display:flex; flex-wrap:wrap; gap:.4rem; align-items:center;">
+        {% if note.tags %}
+          {% for tag in note.tags.split(',') %}
+            {% if tag.strip() %}
+              <span class="tag">{{ tag.strip() }}</span>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {% for kw in note.keywords[:4] %}
+          <span class="kw-tag">{{ kw }}</span>
+        {% endfor %}
+        {% if note.quiz %}
+          <span style="margin-left:auto; font-size:.75rem; color:var(--muted);">{{ note.quiz|length }} quiz questions</span>
+        {% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<div style="text-align:center; padding:5rem 2rem; color:var(--muted);">
+  <div style="font-size:4rem; margin-bottom:1.5rem;">📝</div>
+  <p style="font-family:var(--font-serif); font-size:1.3rem; margin-bottom:.75rem; color:var(--text);">No notes yet</p>
+  <p style="margin-bottom:2rem;">Create your first study note and let AI help you learn.</p>
+  <a href="/new" class="btn btn-primary">+ Create First Note</a>
+</div>
+{% endif %}
+{% endblock %}

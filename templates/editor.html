@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}{% if note %}Edit Note{% else %}New Note{% endif %}{% endblock %}
+
+{% block content %}
+<h1 class="page-title">{% if note %}Edit Note{% else %}New Study Note{% endif %}</h1>
+
+<form method="POST" id="note-form">
+  <!-- Title -->
+  <div style="margin-bottom:1.25rem;">
+    <label style="display:block; font-size:.8rem; color:var(--muted); margin-bottom:.4rem; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.08em;">
+      Title <span style="color:var(--muted); font-weight:400;">(leave blank to auto-generate)</span>
+    </label>
+    <input type="text" name="title" value="{{ title }}" placeholder="e.g. Mitosis and Cell Division"
+      style="width:100%; background:var(--surface); border:1px solid var(--border);
+             border-radius:var(--radius); color:var(--text); padding:.65rem .9rem;
+             font-size:.95rem; font-family:var(--font-sans);"
+      onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+  </div>
+
+  <!-- Content -->
+  <div style="margin-bottom:1.25rem;">
+    <label style="display:block; font-size:.8rem; color:var(--muted); margin-bottom:.4rem; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.08em;">
+      Note Content <span style="color:var(--danger);">*</span>
+    </label>
+    <textarea name="content" rows="14" required placeholder="Paste or type your study notes here…" id="content-area"
+      style="width:100%; background:var(--surface); border:1px solid var(--border);
+             border-radius:var(--radius); color:var(--text); padding:.75rem .9rem;
+             font-size:.9375rem; font-family:var(--font-sans); line-height:1.75;
+             resize:vertical;"
+      onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">{{ content }}</textarea>
+  </div>
+
+  <!-- Tags -->
+  <div style="margin-bottom:1.75rem;">
+    <label style="display:block; font-size:.8rem; color:var(--muted); margin-bottom:.4rem; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.08em;">
+      Tags <span style="color:var(--muted); font-weight:400;">(comma-separated)</span>
+    </label>
+    <input type="text" name="tags" value="{{ tags }}" placeholder="biology, chapter-3, exam"
+      style="width:100%; background:var(--surface); border:1px solid var(--border);
+             border-radius:var(--radius); color:var(--text); padding:.65rem .9rem;
+             font-size:.9rem; font-family:var(--font-mono);"
+      onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='var(--border)'">
+  </div>
+
+  <!-- Action buttons -->
+  <div style="display:flex; gap:.75rem; flex-wrap:wrap; margin-bottom:2rem;">
+    <button type="submit" class="btn btn-primary" style="font-size:.9rem; padding:.65rem 1.5rem;">
+      💾 Save Note
+    </button>
+    <button type="button" onclick="previewAI()" class="btn" style="font-size:.9rem;">
+      ✨ Preview AI Features
+    </button>
+    <a href="{{ '/note/' + note.id|string if note else '/' }}" class="btn">Cancel</a>
+  </div>
+</form>
+
+<!-- AI Preview Panel (hidden until triggered) -->
+<div id="ai-preview" style="display:none;">
+  <div style="height:1px; background:var(--border); margin-bottom:2rem;"></div>
+  <h2 style="font-family:var(--font-serif); font-size:1.3rem; margin-bottom:1.5rem; color:var(--accent);">
+    ✨ AI Preview
+  </h2>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.25rem;">
+    <!-- Title -->
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1.25rem;">
+      <p style="font-size:.7rem; font-family:var(--font-mono); color:var(--accent); text-transform:uppercase; letter-spacing:.1em; margin-bottom:.5rem;">Generated Title</p>
+      <p id="ai-title" style="font-family:var(--font-serif); font-size:1.1rem;"></p>
+    </div>
+    <!-- Keywords -->
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1.25rem;">
+      <p style="font-size:.7rem; font-family:var(--font-mono); color:var(--accent); text-transform:uppercase; letter-spacing:.1em; margin-bottom:.5rem;">Key Concepts</p>
+      <div id="ai-keywords" style="display:flex; flex-wrap:wrap; gap:.4rem;"></div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div style="background:rgba(200,169,110,.07); border-left:3px solid var(--accent); padding:1rem 1.25rem; border-radius:0 8px 8px 0; margin-bottom:1.25rem;">
+    <p style="font-size:.7rem; font-family:var(--font-mono); color:var(--accent); text-transform:uppercase; letter-spacing:.1em; margin-bottom:.5rem;">AI Summary</p>
+    <p id="ai-summary" style="font-size:.9rem;"></p>
+  </div>
+
+  <!-- Quiz preview -->
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1.25rem;">
+    <p style="font-size:.7rem; font-family:var(--font-mono); color:var(--accent2); text-transform:uppercase; letter-spacing:.1em; margin-bottom:1rem;">Quiz Preview (5 questions)</p>
+    <div id="ai-quiz"></div>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading" style="display:none; position:fixed; inset:0; background:rgba(15,15,19,.7); z-index:100; align-items:center; justify-content:center; flex-direction:column; gap:1rem;">
+  <div style="width:40px; height:40px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite;"></div>
+  <p style="color:var(--accent); font-family:var(--font-mono); font-size:.85rem;">Running AI pipeline…</p>
+  <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<script>
+async function previewAI() {
+  const content = document.getElementById('content-area').value.trim();
+  const title = document.querySelector('input[name="title"]').value.trim();
+
+  if (!content) {
+    alert('Please enter some note content first.');
+    return;
+  }
+
+  // Show loading
+  const loading = document.getElementById('loading');
+  loading.style.display = 'flex';
+
+  try {
+    const res = await fetch('/api/preview-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, title }),
+    });
+    const data = await res.json();
+    loading.style.display = 'none';
+
+    // Populate preview
+    document.getElementById('ai-title').textContent = data.title;
+    document.getElementById('ai-summary').textContent = data.summary;
+
+    const kwEl = document.getElementById('ai-keywords');
+    kwEl.innerHTML = data.keywords.map(k =>
+      `<span class="kw-tag">${k}</span>`
+    ).join('');
+
+    const quizEl = document.getElementById('ai-quiz');
+    quizEl.innerHTML = data.quiz.map((q, i) => `
+      <div style="margin-bottom:1rem; padding-bottom:1rem; ${i < data.quiz.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
+        <p style="font-size:.85rem; font-weight:500; margin-bottom:.4rem;">
+          <span style="color:var(--muted); font-family:var(--font-mono);">Q${i+1}.</span>
+          ${q.question}
+        </p>
+        ${q.type === 'mcq'
+          ? `<ul style="list-style:none; display:flex; flex-direction:column; gap:.25rem; padding-left:.5rem;">
+              ${q.options.map(o => `<li style="font-size:.8rem; color:${o===q.answer?'var(--success)':'var(--muted)'};">${o===q.answer?'✓ ':''} ${o}</li>`).join('')}
+            </ul>`
+          : `<p style="font-size:.8rem; color:var(--muted);">True / False → <span style="color:var(--success);">${q.answer}</span></p>`
+        }
+      </div>
+    `).join('');
+
+    document.getElementById('ai-preview').style.display = 'block';
+    document.getElementById('ai-preview').scrollIntoView({ behavior: 'smooth' });
+
+  } catch (err) {
+    loading.style.display = 'none';
+    alert('AI preview failed: ' + err.message);
+  }
+}
+</script>
+{% endblock %}
